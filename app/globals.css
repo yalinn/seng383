@@ -370,6 +370,8 @@ body {
   border-radius: 6px;
   font-size: 1em;
   text-align: center;
+  color: #2d3748;
+  font-weight: 600;
 }
 
 .weight-percent {
