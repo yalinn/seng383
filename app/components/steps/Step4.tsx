@@ -69,18 +69,21 @@ export default function Step4() {
                     <stop offset="100%" style={{ stopColor: "#667eea", stopOpacity: 0.4 }} />
                   </linearGradient>
                 </defs>
+                {/* Outer diamond */}
                 <polygon
-                  points="200,50 320,120 280,230 120,230 80,120"
+                  points="200,50 300,150 200,250 100,150"
                   fill="none"
                   stroke="#e2e8f0"
                   strokeWidth="2"
                 />
+                {/* Inner diamond */}
                 <polygon
-                  points="200,80 290,130 260,210 140,210 110,130"
+                  points="200,80 270,150 200,220 130,150"
                   fill="none"
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
+                {/* Center lines */}
                 <line
                   x1="200"
                   y1="150"
@@ -92,41 +95,35 @@ export default function Step4() {
                 <line
                   x1="200"
                   y1="150"
-                  x2="320"
-                  y2="120"
+                  x2="300"
+                  y2="150"
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
                 <line
                   x1="200"
                   y1="150"
-                  x2="280"
-                  y2="230"
+                  x2="200"
+                  y2="250"
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
                 <line
                   x1="200"
                   y1="150"
-                  x2="120"
-                  y2="230"
+                  x2="100"
+                  y2="150"
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
-                <line
-                  x1="200"
-                  y1="150"
-                  x2="80"
-                  y2="120"
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
+                {/* Data diamond */}
                 <polygon
-                  points="200,70 300,125 265,215 135,215 95,125"
+                  points="200,70 280,150 200,230 120,150"
                   fill="url(#radarGrad)"
                   stroke="#4c51bf"
                   strokeWidth="3"
                 />
+                {/* Labels */}
                 <text
                   x="200"
                   y="40"
@@ -138,8 +135,8 @@ export default function Step4() {
                   Performance
                 </text>
                 <text
-                  x="330"
-                  y="125"
+                  x="310"
+                  y="155"
                   textAnchor="start"
                   fill="#2d3748"
                   fontSize="12"
@@ -148,8 +145,8 @@ export default function Step4() {
                   Compatibility
                 </text>
                 <text
-                  x="290"
-                  y="250"
+                  x="200"
+                  y="270"
                   textAnchor="middle"
                   fill="#2d3748"
                   fontSize="12"
@@ -158,9 +155,9 @@ export default function Step4() {
                   Reliability
                 </text>
                 <text
-                  x="110"
-                  y="250"
-                  textAnchor="middle"
+                  x="90"
+                  y="155"
+                  textAnchor="end"
                   fill="#2d3748"
                   fontSize="12"
                   fontWeight="600"
