@@ -15,12 +15,25 @@ export interface CaseStudy {
   dimensions: string[];
 }
 
+export interface Metric {
+  id: string;
+  name: string;
+  description: string;
+  dimensionId: string;
+  min: number;
+  max: number;
+  direction: 'higher' | 'lower';
+  unit: string;
+  value: number;
+}
+
 export interface Iso15939ContextType {
   // State
   currentStep: number;
   selectedDimensions: string[];
   selectedCaseStudy: string;
   dimensionWeights: Record<string, number>;
+  metrics: Metric[];
   
   // Data
   dimensions: Dimension[];
@@ -34,6 +47,7 @@ export interface Iso15939ContextType {
   selectCaseStudy: (caseStudyId: string) => void;
   selectCaseStudyButton: (caseStudyId: string) => void;
   setDimensionWeight: (dimensionId: string, weight: number) => void;
+  setMetricValue: (metricId: string, value: number) => void;
   nextStep: () => void;
   previousStep: () => void;
   startNewMeasurement: () => void;

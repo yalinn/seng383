@@ -1,9 +1,179 @@
 'use client';
 
-import { useIso15939 } from '../../contexts/Iso15939Context';
+import { useIso15939, Metric } from '../../contexts/Iso15939Context';
+import { useMemo } from 'react';
+
+interface GapAnalysis {
+  dimensionId: string;
+  score: number;
+  gap: number;
+  severity: 'critical' | 'moderate' | 'ok';
+}
+
+interface Recommendation {
+  dimensionId: string;
+  text: string;
+  priority: number;
+}
+
+const TARGET_SCORE = 80;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeMetricScore(metric: Metric): number {
+  const clampedValue = clamp(metric.value, metric.min, metric.max);
+  const range = metric.max - metric.min;
+  
+  if (range === 0) {
+    return 100;
+  }
+  
+  if (metric.direction === 'higher') {
+    // Higher is better: (value - min) / (max - min) * 100
+    return ((clampedValue - metric.min) / range) * 100;
+  } else {
+    // Lower is better: (max - value) / (max - min) * 100
+    return ((metric.max - clampedValue) / range) * 100;
+  }
+}
+
+function computeDimensionScore(dimensionId: string, metrics: Metric[]): number {
+  const dimensionMetrics = metrics.filter((m) => m.dimensionId === dimensionId);
+  if (dimensionMetrics.length === 0) {
+    return 0;
+  }
+  
+  const normalizedScores = dimensionMetrics.map(normalizeMetricScore);
+  const sum = normalizedScores.reduce((acc, score) => acc + score, 0);
+  return sum / normalizedScores.length;
+}
+
+function computeOverallWeightedScore(
+  selectedDimensions: string[],
+  dimensionWeights: Record<string, number>,
+  metrics: Metric[]
+): { score: number; totalWeight: number; normalizedWeights: Record<string, number> } {
+  const totalWeight = selectedDimensions.reduce((sum, dimId) => sum + (dimensionWeights[dimId] || 0), 0);
+  
+  // Normalize weights if total != 100
+  const normalizedWeights: Record<string, number> = {};
+  if (totalWeight > 0) {
+    selectedDimensions.forEach((dimId) => {
+      normalizedWeights[dimId] = totalWeight === 100 
+        ? (dimensionWeights[dimId] || 0) 
+        : ((dimensionWeights[dimId] || 0) / totalWeight) * 100;
+    });
+  }
+  
+  let weightedSum = 0;
+  selectedDimensions.forEach((dimId) => {
+    const dimensionScore = computeDimensionScore(dimId, metrics);
+    weightedSum += dimensionScore * (normalizedWeights[dimId] || 0);
+  });
+  
+  const score = totalWeight > 0 ? weightedSum / 100 : 0;
+  
+  return { score, totalWeight, normalizedWeights };
+}
+
+function computeGapAndSeverity(
+  selectedDimensions: string[],
+  metrics: Metric[]
+): GapAnalysis[] {
+  const gaps: GapAnalysis[] = [];
+  
+  selectedDimensions.forEach((dimensionId) => {
+    const score = computeDimensionScore(dimensionId, metrics);
+    const gap = Math.max(0, TARGET_SCORE - score);
+    
+    let severity: 'critical' | 'moderate' | 'ok';
+    if (gap >= 30) {
+      severity = 'critical';
+    } else if (gap >= 15) {
+      severity = 'moderate';
+    } else {
+      severity = 'ok';
+    }
+    
+    gaps.push({ dimensionId, score, gap, severity });
+  });
+  
+  // Sort by severity (critical first) and then by lowest score
+  gaps.sort((a, b) => {
+    const severityOrder = { critical: 0, moderate: 1, ok: 2 };
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+    if (severityDiff !== 0) return severityDiff;
+    return a.score - b.score;
+  });
+  
+  return gaps;
+}
+
+function generateRecommendations(
+  gaps: GapAnalysis[],
+  selectedCaseStudy: string
+): Recommendation[] {
+  const recommendations: Recommendation[] = [];
+  
+  const recommendationMap: Record<string, string> = {
+    'Performance Efficiency': 'Optimize Performance Efficiency: Implement efficient algorithms, reduce resource consumption, optimize data structures, and use caching strategies to improve response times and capacity.',
+    'Reliability': 'Enhance Reliability: Implement robust error handling, add redundancy, improve monitoring and logging, and establish disaster recovery procedures to increase availability and reduce recovery time.',
+    'Compatibility': 'Improve Compatibility: Ensure interoperability with other systems, follow standard protocols and interfaces, and test cross-platform compatibility to enhance co-existence.',
+    'Security': 'Strengthen Security: Implement secure authentication and authorization, encrypt data in transit and at rest, conduct regular security audits, and keep software dependencies up to date.',
+  };
+  
+  gaps.forEach((gap, index) => {
+    if (gap.severity !== 'ok' && recommendationMap[gap.dimensionId]) {
+      recommendations.push({
+        dimensionId: gap.dimensionId,
+        text: recommendationMap[gap.dimensionId],
+        priority: index + 1,
+      });
+    }
+  });
+  
+  return recommendations;
+}
+
+function getRatingLabel(score: number): string {
+  if (score >= 90) return 'Excellent Quality';
+  if (score >= 80) return 'Very Good Quality';
+  if (score >= 70) return 'Good Quality';
+  if (score >= 60) return 'Fair Quality';
+  if (score >= 50) return 'Poor Quality';
+  return 'Very Poor Quality';
+}
 
 export default function Step4() {
-  const { selectedCaseStudy } = useIso15939();
+  const { selectedCaseStudy, selectedDimensions, dimensionWeights, metrics, caseStudies } = useIso15939();
+  
+  const caseStudy = caseStudies.find((cs) => cs.id === selectedCaseStudy);
+  const caseStudyDescription = caseStudy?.description || '';
+  
+  const { score: overallScore, totalWeight } = useMemo(
+    () => computeOverallWeightedScore(selectedDimensions, dimensionWeights, metrics),
+    [selectedDimensions, dimensionWeights, metrics]
+  );
+  
+  const gaps = useMemo(
+    () => computeGapAndSeverity(selectedDimensions, metrics),
+    [selectedDimensions, metrics]
+  );
+  
+  const recommendations = useMemo(
+    () => generateRecommendations(gaps, selectedCaseStudy),
+    [gaps, selectedCaseStudy]
+  );
+  
+  const dimensionScores = useMemo(() => {
+    const scores: Record<string, number> = {};
+    selectedDimensions.forEach((dimId) => {
+      scores[dimId] = computeDimensionScore(dimId, metrics);
+    });
+    return scores;
+  }, [selectedDimensions, metrics]);
 
   return (
     <>
@@ -45,18 +215,33 @@ export default function Step4() {
           }}
         >
           <p style={{ color: "#6b21a8" }}>
-            <strong>Case Study:</strong> {selectedCaseStudy || 'IoT System'} - Internet of Things device with resource
-            constraints and connectivity requirements
+            <strong>Case Study:</strong> {selectedCaseStudy || 'IoT System'} - {caseStudyDescription}
           </p>
         </div>
+
+        {totalWeight !== 100 && (
+          <div
+            style={{
+              background: "#fff3cd",
+              border: "2px solid #ffc107",
+              borderRadius: 8,
+              padding: 15,
+              marginBottom: 25,
+            }}
+          >
+            <p style={{ color: "#856404" }}>
+              <strong>Warning:</strong> Total weight is {totalWeight}% (expected 100%). Calculations use normalized weights.
+            </p>
+          </div>
+        )}
 
         <div className="results-grid">
           <div className="result-card">
             <h3>Overall Weighted Quality Score</h3>
             <div className="result-score">
-              87.3<span style={{ fontSize: "0.5em" }}>/100</span>
+              {overallScore.toFixed(1)}<span style={{ fontSize: "0.5em" }}>/100</span>
             </div>
-            <div className="result-rating">Very Good Quality</div>
+            <div className="result-rating">{getRatingLabel(overallScore)}</div>
           </div>
 
           <div className="radar-chart">
@@ -116,92 +301,109 @@ export default function Step4() {
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
-                {/* Data diamond */}
+                {/* Data diamond - placeholder for now */}
                 <polygon
                   points="200,70 280,150 200,230 120,150"
                   fill="url(#radarGrad)"
                   stroke="#4c51bf"
                   strokeWidth="3"
                 />
-                {/* Labels */}
-                <text
-                  x="200"
-                  y="40"
-                  textAnchor="middle"
-                  fill="#2d3748"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  Performance
-                </text>
-                <text
-                  x="310"
-                  y="155"
-                  textAnchor="start"
-                  fill="#2d3748"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  Compatibility
-                </text>
-                <text
-                  x="200"
-                  y="270"
-                  textAnchor="middle"
-                  fill="#2d3748"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  Reliability
-                </text>
-                <text
-                  x="90"
-                  y="155"
-                  textAnchor="end"
-                  fill="#2d3748"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  Security
-                </text>
+                {/* Labels - dynamically placed based on selectedDimensions */}
+                {selectedDimensions.includes('Performance Efficiency') && (
+                  <text
+                    x="200"
+                    y="40"
+                    textAnchor="middle"
+                    fill="#2d3748"
+                    fontSize="12"
+                    fontWeight="600"
+                  >
+                    Performance ({dimensionScores['Performance Efficiency']?.toFixed(1) || '0'})
+                  </text>
+                )}
+                {selectedDimensions.includes('Compatibility') && (
+                  <text
+                    x="310"
+                    y="155"
+                    textAnchor="start"
+                    fill="#2d3748"
+                    fontSize="12"
+                    fontWeight="600"
+                  >
+                    Compatibility ({dimensionScores['Compatibility']?.toFixed(1) || '0'})
+                  </text>
+                )}
+                {selectedDimensions.includes('Reliability') && (
+                  <text
+                    x="200"
+                    y="270"
+                    textAnchor="middle"
+                    fill="#2d3748"
+                    fontSize="12"
+                    fontWeight="600"
+                  >
+                    Reliability ({dimensionScores['Reliability']?.toFixed(1) || '0'})
+                  </text>
+                )}
+                {selectedDimensions.includes('Security') && (
+                  <text
+                    x="90"
+                    y="155"
+                    textAnchor="end"
+                    fill="#2d3748"
+                    fontSize="12"
+                    fontWeight="600"
+                  >
+                    Security ({dimensionScores['Security']?.toFixed(1) || '0'})
+                  </text>
+                )}
               </svg>
             </div>
           </div>
 
           <div className="gap-analysis">
             <div className="chart-title">⚠️ Gap Analysis</div>
-            <div className="gap-item moderate">
-              <div>
-                <span className="gap-name">Security</span>
-                <span className="gap-badge moderate">Moderate</span>
+            {gaps.filter((gap) => gap.severity !== 'ok').length === 0 ? (
+              <div style={{ padding: '15px', color: '#28a745' }}>
+                All dimensions meet the target score (≥{TARGET_SCORE}).
               </div>
-              <div className="gap-score">
-                <div className="gap-score-value">65.2</div>
-                <div className="gap-score-diff">Gap: 34.8</div>
-              </div>
-            </div>
+            ) : (
+              gaps
+                .filter((gap) => gap.severity !== 'ok')
+                .map((gap) => (
+                  <div key={gap.dimensionId} className={`gap-item ${gap.severity}`}>
+                    <div>
+                      <span className="gap-name">{gap.dimensionId}</span>
+                      <span className={`gap-badge ${gap.severity}`}>
+                        {gap.severity === 'critical' ? 'Critical' : 'Moderate'}
+                      </span>
+                    </div>
+                    <div className="gap-score">
+                      <div className="gap-score-value">{gap.score.toFixed(1)}</div>
+                      <div className="gap-score-diff">Gap: {gap.gap.toFixed(1)}</div>
+                    </div>
+                  </div>
+                ))
+            )}
           </div>
 
           <div className="recommendations">
             <div className="chart-title">💡 Recommendations</div>
-            <div className="recommendation-item">
-              <div className="rec-number">1.</div>
-              <div className="rec-text">
-                Enhance Security for IoT: Use secure boot, implement device authentication, encrypt
-                data in transit and at rest, and regular firmware updates.
+            {recommendations.length === 0 ? (
+              <div style={{ padding: '15px', color: '#28a745' }}>
+                No recommendations. All dimensions are performing well.
               </div>
-            </div>
-            <div className="recommendation-item">
-              <div className="rec-number">2.</div>
-              <div className="rec-text">
-                Optimize Performance Efficiency for IoT: Implement efficient data compression, reduce
-                polling frequency, and use edge computing to minimize resource usage.
-              </div>
-            </div>
+            ) : (
+              recommendations.map((rec) => (
+                <div key={rec.dimensionId} className="recommendation-item">
+                  <div className="rec-number">{rec.priority}.</div>
+                  <div className="rec-text">{rec.text}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
     </>
   );
 }
-

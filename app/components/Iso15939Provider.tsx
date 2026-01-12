@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
-import { Iso15939Context, Iso15939ContextType, Dimension, CaseStudy } from '../contexts/Iso15939Context';
+import { useState, useEffect, ReactNode } from 'react';
+import { Iso15939Context, Iso15939ContextType, Dimension, CaseStudy, Metric } from '../contexts/Iso15939Context';
 
 interface Iso15939ProviderProps {
   children: ReactNode;
@@ -17,13 +17,6 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     'Reliability': 25,
     'Security': 20,
   });
-
-  const dimensions: Dimension[] = [
-    { id: 'Performance Efficiency', name: 'Performance Efficiency', subChars: '3 sub-characteristics' },
-    { id: 'Compatibility', name: 'Compatibility', subChars: '2 sub-characteristics' },
-    { id: 'Reliability', name: 'Reliability', subChars: '4 sub-characteristics' },
-    { id: 'Security', name: 'Security', subChars: '5 sub-characteristics' },
-  ];
 
   const caseStudies: CaseStudy[] = [
     {
@@ -45,6 +38,248 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       dimensions: ['Usability', 'Compatibility', 'Performance Efficiency', 'Portability'],
     },
   ];
+
+  // Build dimensions array from union of all case study dimensions
+  const allDimensionIds = new Set<string>();
+  caseStudies.forEach((cs) => {
+    cs.dimensions.forEach((dim) => allDimensionIds.add(dim));
+  });
+
+  const dimensions: Dimension[] = Array.from(allDimensionIds)
+    .sort()
+    .map((id) => {
+      // Map dimension IDs to their sub-characteristics counts
+      const subCharsMap: Record<string, string> = {
+        'Performance Efficiency': '3 sub-characteristics',
+        'Compatibility': '2 sub-characteristics',
+        'Reliability': '4 sub-characteristics',
+        'Security': '5 sub-characteristics',
+        'Usability': '5 sub-characteristics',
+        'Portability': '3 sub-characteristics',
+        'Functional Suitability': '4 sub-characteristics',
+        'Maintainability': '4 sub-characteristics',
+      };
+      return {
+        id,
+        name: id,
+        subChars: subCharsMap[id] || '3 sub-characteristics',
+      };
+    });
+
+  const initializeMetricsForCaseStudy = (caseStudyId: string, dimensions: string[]): Metric[] => {
+    const metrics: Metric[] = [];
+
+    if (caseStudyId === 'IoT System') {
+      if (dimensions.includes('Performance Efficiency')) {
+        metrics.push(
+          {
+            id: 'time-behaviour',
+            name: 'Time Behaviour',
+            description: 'Response time',
+            dimensionId: 'Performance Efficiency',
+            min: 0,
+            max: 5000,
+            direction: 'lower',
+            unit: 'ms',
+            value: 180,
+          },
+          {
+            id: 'resource-utilization',
+            name: 'Resource Utilization',
+            description: 'CPU/Memory usage',
+            dimensionId: 'Performance Efficiency',
+            min: 0,
+            max: 100,
+            direction: 'lower',
+            unit: '%',
+            value: 45,
+          },
+          {
+            id: 'capacity',
+            name: 'Capacity',
+            description: 'Concurrent users',
+            dimensionId: 'Performance Efficiency',
+            min: 0,
+            max: 10000,
+            direction: 'higher',
+            unit: 'users',
+            value: 500,
+          }
+        );
+      }
+      if (dimensions.includes('Reliability')) {
+        metrics.push(
+          {
+            id: 'availability',
+            name: 'Availability',
+            description: 'Uptime percentage',
+            dimensionId: 'Reliability',
+            min: 0,
+            max: 100,
+            direction: 'higher',
+            unit: '%',
+            value: 98,
+          },
+          {
+            id: 'recoverability',
+            name: 'Recoverability',
+            description: 'Recovery time',
+            dimensionId: 'Reliability',
+            min: 0,
+            max: 300,
+            direction: 'lower',
+            unit: 'seconds',
+            value: 30,
+          }
+        );
+      }
+      if (dimensions.includes('Compatibility')) {
+        metrics.push({
+          id: 'co-existence',
+          name: 'Co-existence',
+          description: 'Ability to coexist with other products',
+          dimensionId: 'Compatibility',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 85,
+        });
+      }
+      if (dimensions.includes('Security')) {
+        metrics.push({
+          id: 'confidentiality',
+          name: 'Confidentiality',
+          description: 'Data protection level',
+          dimensionId: 'Security',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 75,
+        });
+      }
+    } else if (caseStudyId === 'Safety Critical (Health)') {
+      if (dimensions.includes('Reliability')) {
+        metrics.push({
+          id: 'health-availability',
+          name: 'Availability',
+          description: 'System uptime percentage',
+          dimensionId: 'Reliability',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 99.5,
+        });
+      }
+      if (dimensions.includes('Security')) {
+        metrics.push({
+          id: 'health-confidentiality',
+          name: 'Confidentiality',
+          description: 'Patient data protection level',
+          dimensionId: 'Security',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 95,
+        });
+      }
+      if (dimensions.includes('Performance Efficiency')) {
+        metrics.push({
+          id: 'health-response-time',
+          name: 'Response Time',
+          description: 'Critical operation response time',
+          dimensionId: 'Performance Efficiency',
+          min: 0,
+          max: 5000,
+          direction: 'lower',
+          unit: 'ms',
+          value: 150,
+        });
+      }
+      if (dimensions.includes('Usability')) {
+        metrics.push({
+          id: 'health-user-error-rate',
+          name: 'User Error Rate',
+          description: 'Error rate in medical procedures',
+          dimensionId: 'Usability',
+          min: 0,
+          max: 100,
+          direction: 'lower',
+          unit: '%',
+          value: 5,
+        });
+      }
+    } else if (caseStudyId === 'Mobile Application') {
+      if (dimensions.includes('Usability')) {
+        metrics.push({
+          id: 'mobile-user-error-rate',
+          name: 'User Error Rate',
+          description: 'User interaction error rate',
+          dimensionId: 'Usability',
+          min: 0,
+          max: 100,
+          direction: 'lower',
+          unit: '%',
+          value: 10,
+        });
+      }
+      if (dimensions.includes('Compatibility')) {
+        metrics.push({
+          id: 'mobile-co-existence',
+          name: 'Co-existence',
+          description: 'Cross-platform compatibility',
+          dimensionId: 'Compatibility',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 90,
+        });
+      }
+      if (dimensions.includes('Performance Efficiency')) {
+        metrics.push({
+          id: 'mobile-response-time',
+          name: 'Response Time',
+          description: 'App response time',
+          dimensionId: 'Performance Efficiency',
+          min: 0,
+          max: 5000,
+          direction: 'lower',
+          unit: 'ms',
+          value: 200,
+        });
+      }
+      if (dimensions.includes('Portability')) {
+        metrics.push({
+          id: 'mobile-install-success-rate',
+          name: 'Install Success Rate',
+          description: 'Successful installation rate',
+          dimensionId: 'Portability',
+          min: 0,
+          max: 100,
+          direction: 'higher',
+          unit: '%',
+          value: 90,
+        });
+      }
+    }
+
+    return metrics;
+  };
+
+  const [metrics, setMetrics] = useState<Metric[]>(() =>
+    initializeMetricsForCaseStudy('IoT System', ['Performance Efficiency', 'Compatibility', 'Reliability', 'Security'])
+  );
+
+  useEffect(() => {
+    const caseStudy = caseStudies.find((cs) => cs.id === selectedCaseStudy);
+    if (caseStudy) {
+      setMetrics(initializeMetricsForCaseStudy(selectedCaseStudy, caseStudy.dimensions));
+    }
+  }, [selectedCaseStudy]);
 
   const selectDimension = (dimensionId: string) => {
     setSelectedDimensions((prev) => {
@@ -72,7 +307,13 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
   };
 
   const selectCaseStudyButton = (caseStudyId: string) => {
-    selectCaseStudy(caseStudyId);
+    const caseStudy = caseStudies.find((cs) => cs.id === caseStudyId);
+    if (caseStudy) {
+      setSelectedCaseStudy(caseStudyId);
+      setSelectedDimensions([...caseStudy.dimensions]);
+    } else {
+      selectCaseStudy(caseStudyId);
+    }
   };
 
   const setDimensionWeight = (dimensionId: string, weight: number) => {
@@ -80,6 +321,16 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       ...prev,
       [dimensionId]: weight,
     }));
+  };
+
+  const setMetricValue = (metricId: string, value: number) => {
+    setMetrics((prev) =>
+      prev.map((metric) =>
+        metric.id === metricId
+          ? { ...metric, value: Math.max(metric.min, Math.min(metric.max, value)) }
+          : metric
+      )
+    );
   };
 
   const nextStep = () => {
@@ -96,7 +347,8 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
 
   const startNewMeasurement = () => {
     setCurrentStep(1);
-    setSelectedDimensions(['Performance Efficiency', 'Compatibility', 'Reliability', 'Security']);
+    const defaultDimensions = ['Performance Efficiency', 'Compatibility', 'Reliability', 'Security'];
+    setSelectedDimensions(defaultDimensions);
     setSelectedCaseStudy('IoT System');
     setDimensionWeights({
       'Performance Efficiency': 30,
@@ -104,6 +356,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       'Reliability': 25,
       'Security': 20,
     });
+    setMetrics(initializeMetricsForCaseStudy('IoT System', defaultDimensions));
   };
 
   const value: Iso15939ContextType = {
@@ -111,6 +364,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     selectedDimensions,
     selectedCaseStudy,
     dimensionWeights,
+    metrics,
     dimensions,
     caseStudies,
     setCurrentStep,
@@ -120,6 +374,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     selectCaseStudy,
     selectCaseStudyButton,
     setDimensionWeight,
+    setMetricValue,
     nextStep,
     previousStep,
     startNewMeasurement,
@@ -127,4 +382,3 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
 
   return <Iso15939Context.Provider value={value}>{children}</Iso15939Context.Provider>;
 }
-

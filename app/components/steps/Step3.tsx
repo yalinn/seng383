@@ -3,7 +3,17 @@
 import { useIso15939 } from '../../contexts/Iso15939Context';
 
 export default function Step3() {
-  const { selectedDimensions } = useIso15939();
+  const { selectedDimensions, metrics, setMetricValue } = useIso15939();
+
+  // Filter metrics by selected dimensions and group by dimension
+  const metricsByDimension = selectedDimensions.reduce((acc, dimensionId) => {
+    const dimensionMetrics = metrics.filter((m) => m.dimensionId === dimensionId);
+    if (dimensionMetrics.length > 0) {
+      acc[dimensionId] = dimensionMetrics;
+    }
+    return acc;
+  }, {} as Record<string, typeof metrics>);
+
   return (
     <>
       <div className="app-header">
@@ -39,151 +49,55 @@ export default function Step3() {
         </p>
 
         <div className="metrics-container">
-          {selectedDimensions.includes('Performance Efficiency') && (
-          <div className="metric-dimension">
-            <div className="metric-dimension-title">Performance Efficiency</div>
-            <div className="metric-items">
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Time Behaviour</div>
-                    <div className="metric-desc">Response time</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="180" readOnly />
-                    <span className="metric-unit">ms</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 5000</span>
-                  <span className="inverse-badge">Lower is better</span>
-                </div>
-              </div>
+          {selectedDimensions.map((dimensionId) => {
+            const dimensionMetrics = metricsByDimension[dimensionId];
+            if (!dimensionMetrics || dimensionMetrics.length === 0) {
+              return null;
+            }
 
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Resource Utilization</div>
-                    <div className="metric-desc">CPU/Memory usage</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="45" readOnly />
-                    <span className="metric-unit">%</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 100</span>
-                  <span className="inverse-badge">Lower is better</span>
-                </div>
-              </div>
-
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Capacity</div>
-                    <div className="metric-desc">Concurrent users</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="500" readOnly />
-                    <span className="metric-unit">users</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 10000</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {selectedDimensions.includes('Reliability') && (
-          <div className="metric-dimension">
-            <div className="metric-dimension-title">Reliability</div>
-            <div className="metric-items">
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Availability</div>
-                    <div className="metric-desc">Uptime percentage</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="98" readOnly />
-                    <span className="metric-unit">%</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 100</span>
+            return (
+              <div key={dimensionId} className="metric-dimension">
+                <div className="metric-dimension-title">{dimensionId}</div>
+                <div className="metric-items">
+                  {dimensionMetrics.map((metric) => (
+                    <div key={metric.id} className="metric-item">
+                      <div className="metric-row">
+                        <div>
+                          <div className="metric-name">{metric.name}</div>
+                          <div className="metric-desc">{metric.description}</div>
+                        </div>
+                        <div className="metric-input-row">
+                          <input
+                            type="number"
+                            className="metric-input"
+                            value={metric.value}
+                            onChange={(e) => {
+                              const numValue = parseFloat(e.target.value);
+                              if (!isNaN(numValue)) {
+                                setMetricValue(metric.id, numValue);
+                              }
+                            }}
+                            min={metric.min}
+                            max={metric.max}
+                            step="any"
+                          />
+                          <span className="metric-unit">{metric.unit}</span>
+                        </div>
+                      </div>
+                      <div className="metric-info">
+                        <span>Range: {metric.min} - {metric.max}</span>
+                        {metric.direction === 'lower' && (
+                          <span className="inverse-badge">Lower is better</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Recoverability</div>
-                    <div className="metric-desc">Recovery time</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="30" readOnly />
-                    <span className="metric-unit">seconds</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 300</span>
-                  <span className="inverse-badge">Lower is better</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {selectedDimensions.includes('Compatibility') && (
-          <div className="metric-dimension">
-            <div className="metric-dimension-title">Compatibility</div>
-            <div className="metric-items">
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Co-existence</div>
-                    <div className="metric-desc">Ability to coexist with other products</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="85" readOnly />
-                    <span className="metric-unit">%</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 100</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
-
-          {selectedDimensions.includes('Security') && (
-          <div className="metric-dimension">
-            <div className="metric-dimension-title">Security</div>
-            <div className="metric-items">
-              <div className="metric-item">
-                <div className="metric-row">
-                  <div>
-                    <div className="metric-name">Confidentiality</div>
-                    <div className="metric-desc">Data protection level</div>
-                  </div>
-                  <div className="metric-input-row">
-                    <input type="text" className="metric-input" value="75" readOnly />
-                    <span className="metric-unit">%</span>
-                  </div>
-                </div>
-                <div className="metric-info">
-                  <span>Range: 0 - 100</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          )}
+            );
+          })}
         </div>
       </div>
     </>
   );
 }
-
