@@ -45,7 +45,7 @@ export default function Step3() {
       <div className="content-area">
         <h2 className="section-title">Step 3: Collect - Enter Metric Values</h2>
         <p className="section-subtitle">
-          Enter measurement values for each sub-characteristic based on ISO 25023 metrics.
+          Enter measurement values for metrics. Sub-characteristics are implicitly addressed through selected measurement metrics, in accordance with ISO/IEC 25010 and ISO/IEC 15939.
         </p>
 
         <div className="metrics-container">
@@ -65,6 +65,9 @@ export default function Step3() {
                         <div>
                           <div className="metric-name">{metric.name}</div>
                           <div className="metric-desc">{metric.description}</div>
+                          <div style={{ fontSize: '0.75em', color: '#718096', marginTop: '4px', fontStyle: 'italic' }}>
+                            Measured sub-characteristic: {metric.subCharacteristic} (ISO/IEC 25010)
+                          </div>
                         </div>
                         <div className="metric-input-row">
                           <input

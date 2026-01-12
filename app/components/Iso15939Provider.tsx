@@ -79,6 +79,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
         name: 'Functional Completeness',
         description: 'Degree to which functions cover required tasks',
         dimensionId: 'Functional Suitability',
+        subCharacteristic: 'Functional Completeness',
         min: 0,
         max: 100,
         direction: 'higher',
@@ -92,6 +93,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           name: 'Time Behaviour',
           description: 'Response time',
           dimensionId: 'Performance Efficiency',
+          subCharacteristic: 'Time Behaviour',
           min: 0,
           max: 5000,
           direction: 'lower',
@@ -103,6 +105,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           name: 'Resource Utilization',
           description: 'CPU/Memory usage',
           dimensionId: 'Performance Efficiency',
+          subCharacteristic: 'Resource Utilization',
           min: 0,
           max: 100,
           direction: 'lower',
@@ -114,6 +117,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           name: 'Capacity',
           description: 'Concurrent users',
           dimensionId: 'Performance Efficiency',
+          subCharacteristic: 'Capacity',
           min: 0,
           max: 10000,
           direction: 'higher',
@@ -129,6 +133,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           ? 'Cross-platform compatibility' 
           : 'Ability to coexist with other products',
         dimensionId: 'Compatibility',
+        subCharacteristic: 'Co-existence',
         min: 0,
         max: 100,
         direction: 'higher',
@@ -143,6 +148,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           ? 'Error rate in medical procedures'
           : 'User interaction error rate',
         dimensionId: 'Usability',
+        subCharacteristic: 'User Error Protection',
         min: 0,
         max: 100,
         direction: 'lower',
@@ -156,6 +162,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           name: 'Availability',
           description: 'System uptime percentage',
           dimensionId: 'Reliability',
+          subCharacteristic: 'Availability',
           min: 0,
           max: 100,
           direction: 'higher',
@@ -169,6 +176,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
             name: 'Availability',
             description: 'Uptime percentage',
             dimensionId: 'Reliability',
+            subCharacteristic: 'Availability',
             min: 0,
             max: 100,
             direction: 'higher',
@@ -180,6 +188,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
             name: 'Recoverability',
             description: 'Recovery time',
             dimensionId: 'Reliability',
+            subCharacteristic: 'Recoverability',
             min: 0,
             max: 300,
             direction: 'lower',
@@ -196,6 +205,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           ? 'Patient data protection level' 
           : 'Data protection level',
         dimensionId: 'Security',
+        subCharacteristic: 'Confidentiality',
         min: 0,
         max: 100,
         direction: 'higher',
@@ -208,6 +218,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
         name: 'Test Coverage',
         description: 'Percentage of code covered by tests',
         dimensionId: 'Maintainability',
+        subCharacteristic: 'Testability',
         min: 0,
         max: 100,
         direction: 'higher',
@@ -220,6 +231,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
         name: 'Install Success Rate',
         description: 'Successful installation rate',
         dimensionId: 'Portability',
+        subCharacteristic: 'Installability',
         min: 0,
         max: 100,
         direction: 'higher',
@@ -286,6 +298,40 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       });
     }
   }, [selectedCaseStudy, selectedDimensions, initializeMetricsForCaseStudy, getMetricsForDimension]);
+
+  // Initialize weights for manually selected dimensions (when dimensions don't match case study)
+  useEffect(() => {
+    const caseStudy = caseStudies.find((cs) => cs.id === selectedCaseStudy);
+    const dimensionsMatchCaseStudy = caseStudy && 
+      selectedDimensions.length === caseStudy.dimensions.length &&
+      selectedDimensions.every((id) => caseStudy.dimensions.includes(id)) &&
+      caseStudy.dimensions.every((id) => selectedDimensions.includes(id));
+    
+    // If dimensions don't match case study (manual selection), initialize missing weights
+    if (!dimensionsMatchCaseStudy && selectedDimensions.length > 0) {
+      setDimensionWeights((prevWeights) => {
+        const hasMissingWeights = selectedDimensions.some((dimId) => !(dimId in prevWeights));
+        
+        if (!hasMissingWeights) {
+          return prevWeights; // All weights already exist
+        }
+        
+        // Calculate equal distribution for all selected dimensions
+        const weightPerDimension = Math.round(100 / selectedDimensions.length);
+        const remainder = 100 - (weightPerDimension * selectedDimensions.length);
+        const newWeights = { ...prevWeights };
+        
+        selectedDimensions.forEach((dimId, index) => {
+          if (!(dimId in newWeights)) {
+            // Only set weight if it doesn't exist
+            newWeights[dimId] = weightPerDimension + (index < remainder ? 1 : 0);
+          }
+        });
+        
+        return newWeights;
+      });
+    }
+  }, [selectedDimensions, selectedCaseStudy]);
 
   const selectDimension = (dimensionId: string) => {
     setSelectedDimensions((prev) => {

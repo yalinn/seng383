@@ -20,6 +20,7 @@ export interface Metric {
   name: string;
   description: string;
   dimensionId: string;
+  subCharacteristic: string; // ISO 25010 sub-characteristic (required, embedded in metric definition)
   min: number;
   max: number;
   direction: 'higher' | 'lower';

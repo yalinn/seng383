@@ -39,6 +39,10 @@ function normalizeMetricScore(metric: Metric): number {
   }
 }
 
+// Analysis is based on metric → dimension → overall score.
+// Sub-characteristics are implicitly addressed through selected measurement metrics,
+// in accordance with ISO/IEC 25010 and ISO/IEC 15939.
+// No explicit sub-characteristic calculations are performed.
 function computeDimensionScore(dimensionId: string, metrics: Metric[]): number {
   const dimensionMetrics = metrics.filter((m) => m.dimensionId === dimensionId);
   if (dimensionMetrics.length === 0) {
