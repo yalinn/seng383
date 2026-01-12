@@ -180,6 +180,93 @@ export default function Step4() {
     return scores;
   }, [selectedDimensions, metrics]);
 
+  // Calculate radar chart geometry based on number of dimensions
+  const chartGeometry = useMemo(() => {
+    const numDimensions = selectedDimensions.length;
+    const centerX = 200;
+    const centerY = 150;
+    const radius = 100;
+    
+    if (numDimensions === 0) {
+      return { outerPoints: '', innerPoints: '', dataPoints: '', axes: [], labelPositions: [] };
+    }
+    
+    if (numDimensions === 1) {
+      // Single dimension: just show score, no polygon
+      const score = dimensionScores[selectedDimensions[0]] || 0;
+      return {
+        outerPoints: '',
+        innerPoints: '',
+        dataPoints: '',
+        axes: [],
+        labelPositions: [{
+          dimensionId: selectedDimensions[0],
+          x: centerX,
+          y: centerY - radius - 20,
+          anchor: 'middle',
+        }],
+        singleScore: score,
+      };
+    }
+    
+    // Calculate angles (start from top, clockwise)
+    const angles = selectedDimensions.map((_, index) => {
+      // Start from top (-90 degrees) and distribute evenly
+      return (-90 + (index * 360 / numDimensions)) * (Math.PI / 180);
+    });
+    
+    // Calculate outer polygon points (at 100% radius)
+    const outerPoints = angles.map((angle) => {
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      return `${x},${y}`;
+    }).join(' ');
+    
+    // Calculate inner polygon points (at 50% radius)
+    const innerRadius = radius * 0.5;
+    const innerPoints = angles.map((angle) => {
+      const x = centerX + innerRadius * Math.cos(angle);
+      const y = centerY + innerRadius * Math.sin(angle);
+      return `${x},${y}`;
+    }).join(' ');
+    
+    // Calculate data polygon points (using actual scores)
+    const dataPoints = angles.map((angle, index) => {
+      const score = dimensionScores[selectedDimensions[index]] || 0;
+      const dataRadius = radius * (score / 100);
+      const x = centerX + dataRadius * Math.cos(angle);
+      const y = centerY + dataRadius * Math.sin(angle);
+      return `${x},${y}`;
+    }).join(' ');
+    
+    // Calculate axes (lines from center to outer points)
+    const axes = angles.map((angle) => {
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      return { x1: centerX, y1: centerY, x2: x, y2: y };
+    });
+    
+    // Calculate label positions (outside the polygon)
+    const labelRadius = radius + 30;
+    const labelPositions = angles.map((angle, index) => {
+      const x = centerX + labelRadius * Math.cos(angle);
+      const y = centerY + labelRadius * Math.sin(angle);
+      // Determine text anchor based on angle
+      let anchor: 'start' | 'middle' | 'end' = 'middle';
+      if (Math.abs(Math.cos(angle)) > 0.7) {
+        anchor = Math.cos(angle) > 0 ? 'start' : 'end';
+      }
+      return {
+        dimensionId: selectedDimensions[index],
+        x,
+        y,
+        anchor,
+      };
+    });
+    
+    return { outerPoints, innerPoints, dataPoints, axes, labelPositions };
+  }, [selectedDimensions, dimensionScores]);
+
   return (
     <>
       <div className="app-header">
@@ -259,108 +346,139 @@ export default function Step4() {
                     <stop offset="100%" style={{ stopColor: "#667eea", stopOpacity: 0.4 }} />
                   </linearGradient>
                 </defs>
-                {/* Outer diamond */}
+                {selectedDimensions.length === 1 ? (
+                  // Single dimension: just show score
+                  <>
+                    <circle
+                      cx="200"
+                      cy="150"
+                      r="80"
+                      fill="url(#radarGrad)"
+                      stroke="#4c51bf"
+                      strokeWidth="3"
+                    />
+                    <text
+                      x="200"
+                      y="145"
+                      textAnchor="middle"
+                      fill="#2d3748"
+                      fontSize="32"
+                      fontWeight="700"
+                    >
+                      {chartGeometry.singleScore?.toFixed(1) || '0'}
+                    </text>
+                    <text
+                      x="200"
+                      y="165"
+                      textAnchor="middle"
+                      fill="#718096"
+                      fontSize="14"
+                    >
+                      /100
+                    </text>
+                    {chartGeometry.labelPositions.map((pos) => (
+                      <text
+                        key={pos.dimensionId}
+                        x={pos.x}
+                        y={pos.y}
+                        textAnchor={pos.anchor as "start" | "middle" | "end"}
+                        fill="#2d3748"
+                        fontSize="14"
+                        fontWeight="600"
+                      >
+                        {selectedDimensions[0]}
+                      </text>
+                    ))}
+                  </>
+                ) : selectedDimensions.length === 2 ? (
+                  // Two dimensions: show line (dengeli çizgi)
+                  <>
+                    <line
+                      x1={chartGeometry.axes[0]?.x2 || 200}
+                      y1={chartGeometry.axes[0]?.y2 || 150}
+                      x2={chartGeometry.axes[1]?.x2 || 200}
+                      y2={chartGeometry.axes[1]?.y2 || 150}
+                      stroke="#e2e8f0"
+                      strokeWidth="2"
+                    />
+                    <line
+                      x1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[0] || 200}
+                      y1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[1] || 150}
+                      x2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[0] || 200}
+                      y2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[1] || 150}
+                      stroke="#4c51bf"
+                      strokeWidth="4"
+                    />
+                    {chartGeometry.labelPositions.map((pos) => (
+                      <text
+                        key={pos.dimensionId}
+                        x={pos.x}
+                        y={pos.y}
+                        textAnchor={pos.anchor as "start" | "middle" | "end"}
+                        fill="#2d3748"
+                        fontSize="12"
+                        fontWeight="600"
+                      >
+                        {pos.dimensionId.split(' ')[0]} ({dimensionScores[pos.dimensionId]?.toFixed(1) || '0'})
+                      </text>
+                    ))}
+                  </>
+                ) : (
+                  // Three or more dimensions: show polygon
+                  <>
+                    {chartGeometry.outerPoints && (
                 <polygon
-                  points="200,50 300,150 200,250 100,150"
+                        points={chartGeometry.outerPoints}
                   fill="none"
                   stroke="#e2e8f0"
                   strokeWidth="2"
                 />
-                {/* Inner diamond */}
+                    )}
+                    {chartGeometry.innerPoints && (
                 <polygon
-                  points="200,80 270,150 200,220 130,150"
+                        points={chartGeometry.innerPoints}
                   fill="none"
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
-                {/* Center lines */}
+                    )}
+                    {chartGeometry.axes.map((axis, index) => (
                 <line
-                  x1="200"
-                  y1="150"
-                  x2="200"
-                  y2="50"
+                        key={index}
+                        x1={axis.x1}
+                        y1={axis.y1}
+                        x2={axis.x2}
+                        y2={axis.y2}
                   stroke="#cbd5e0"
                   strokeWidth="1"
                 />
-                <line
-                  x1="200"
-                  y1="150"
-                  x2="300"
-                  y2="150"
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="200"
-                  y1="150"
-                  x2="200"
-                  y2="250"
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="200"
-                  y1="150"
-                  x2="100"
-                  y2="150"
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
-                {/* Data diamond - placeholder for now */}
+                    ))}
+                    {chartGeometry.dataPoints && (
                 <polygon
-                  points="200,70 280,150 200,230 120,150"
+                        points={chartGeometry.dataPoints}
                   fill="url(#radarGrad)"
                   stroke="#4c51bf"
                   strokeWidth="3"
                 />
-                {/* Labels - dynamically placed based on selectedDimensions */}
-                {selectedDimensions.includes('Performance Efficiency') && (
-                  <text
-                    x="200"
-                    y="40"
-                    textAnchor="middle"
-                    fill="#2d3748"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Performance ({dimensionScores['Performance Efficiency']?.toFixed(1) || '0'})
-                  </text>
-                )}
-                {selectedDimensions.includes('Compatibility') && (
-                  <text
-                    x="310"
-                    y="155"
-                    textAnchor="start"
-                    fill="#2d3748"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Compatibility ({dimensionScores['Compatibility']?.toFixed(1) || '0'})
-                  </text>
-                )}
-                {selectedDimensions.includes('Reliability') && (
-                  <text
-                    x="200"
-                    y="270"
-                    textAnchor="middle"
-                    fill="#2d3748"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Reliability ({dimensionScores['Reliability']?.toFixed(1) || '0'})
-                  </text>
-                )}
-                {selectedDimensions.includes('Security') && (
-                  <text
-                    x="90"
-                    y="155"
-                    textAnchor="end"
-                    fill="#2d3748"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Security ({dimensionScores['Security']?.toFixed(1) || '0'})
-                  </text>
+                    )}
+                    {chartGeometry.labelPositions.map((pos) => {
+                      // Shorten dimension names for display
+                      const shortName = pos.dimensionId.split(' ')[0];
+                      return (
+                        <text
+                          key={pos.dimensionId}
+                          x={pos.x}
+                          y={pos.y}
+                          textAnchor={pos.anchor as "start" | "middle" | "end"}
+                          fill="#2d3748"
+                          fontSize="12"
+                          fontWeight="600"
+                        >
+                          {shortName} ({dimensionScores[pos.dimensionId]?.toFixed(1) || '0'})
+                        </text>
+                      );
+                    })}
+                  </>
                 )}
               </svg>
             </div>
@@ -382,12 +500,12 @@ export default function Step4() {
                       <span className={`gap-badge ${gap.severity}`}>
                         {gap.severity === 'critical' ? 'Critical' : 'Moderate'}
                       </span>
-                    </div>
-                    <div className="gap-score">
+              </div>
+              <div className="gap-score">
                       <div className="gap-score-value">{gap.score.toFixed(1)}</div>
                       <div className="gap-score-diff">Gap: {gap.gap.toFixed(1)}</div>
-                    </div>
-                  </div>
+              </div>
+            </div>
                 ))
             )}
           </div>
@@ -403,7 +521,7 @@ export default function Step4() {
                 <div key={rec.dimensionId} className="recommendation-item">
                   <div className="rec-number">{rec.priority}.</div>
                   <div className="rec-text">{rec.text}</div>
-                </div>
+            </div>
               ))
             )}
           </div>
