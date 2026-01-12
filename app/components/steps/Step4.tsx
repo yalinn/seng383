@@ -16,6 +16,8 @@ interface Recommendation {
   priority: number;
 }
 
+type Interpretation = 'Strong' | 'Moderate' | 'Weak';
+
 const TARGET_SCORE = 80;
 
 function clamp(value: number, min: number, max: number): number {
@@ -40,9 +42,6 @@ function normalizeMetricScore(metric: Metric): number {
 }
 
 // Analysis is based on metric → dimension → overall score.
-// Sub-characteristics are implicitly addressed through selected measurement metrics,
-// in accordance with ISO/IEC 25010 and ISO/IEC 15939.
-// No explicit sub-characteristic calculations are performed.
 function computeDimensionScore(dimensionId: string, metrics: Metric[]): number {
   const dimensionMetrics = metrics.filter((m) => m.dimensionId === dimensionId);
   if (dimensionMetrics.length === 0) {
@@ -124,7 +123,6 @@ function generateRecommendations(
   const recommendationMap: Record<string, string> = {
     'Functional Suitability': 'Improve Functional Suitability: Conduct requirements analysis to identify missing functions, implement user-requested features, and ensure the software meets all specified functional requirements.',
     'Performance Efficiency': 'Optimize Performance Efficiency: Implement efficient algorithms, reduce resource consumption, optimize data structures, and use caching strategies to improve response times and capacity.',
-    'Compatibility': 'Improve Compatibility: Ensure interoperability with other systems, follow standard protocols and interfaces, and test cross-platform compatibility to enhance co-existence.',
     'Usability': 'Enhance Usability: Simplify user interfaces, provide clear feedback and error messages, conduct user testing, and implement user error protection mechanisms.',
     'Reliability': 'Enhance Reliability: Implement robust error handling, add redundancy, improve monitoring and logging, and establish disaster recovery procedures to increase availability and reduce recovery time.',
     'Security': 'Strengthen Security: Implement secure authentication and authorization, encrypt data in transit and at rest, conduct regular security audits, and keep software dependencies up to date.',
@@ -155,13 +153,91 @@ function getRatingLabel(score: number): string {
   return 'Very Poor Quality';
 }
 
+function getInterpretation(score: number): Interpretation {
+  if (score >= 80) return 'Strong';
+  if (score >= 60) return 'Moderate';
+  return 'Weak';
+}
+
+function getInterpretationDetails(dimensionId: string, interpretation: Interpretation): { comment: string, action: string } {
+  const isStrong = interpretation === 'Strong';
+  const isModerate = interpretation === 'Moderate';
+  
+  // Base map for text content (Compatibility removed)
+  const map: Record<string, { strong: string, mod: string, weak: string, actStrong: string, actImprove: string }> = {
+    'Functional Suitability': {
+      strong: 'Functional completeness meets high standards.',
+      mod: 'Minor functional gaps identified.',
+      weak: 'Significant missing functionality found.',
+      actStrong: 'Maintain rigorous regression testing.',
+      actImprove: 'Prioritize feature implementation based on user needs.',
+    },
+    'Performance Efficiency': {
+      strong: 'Resource usage and timing are optimal.',
+      mod: 'Response times are acceptable but variable.',
+      weak: 'System performance is below expectations.',
+      actStrong: 'Monitor metrics for regression.',
+      actImprove: 'Profile code to identify bottlenecks.',
+    },
+    'Usability': {
+      strong: 'Interface is intuitive and user-friendly.',
+      mod: 'Some user workflows cause friction.',
+      weak: 'High error rates and confusion observed.',
+      actStrong: 'Continue user-centric design validation.',
+      actImprove: 'Simplify complex workflows and improve help text.',
+    },
+    'Reliability': {
+      strong: 'System is highly available and fault-tolerant.',
+      mod: 'Basic reliability met, but recovery is slow.',
+      weak: 'Frequent failures or instability detected.',
+      actStrong: 'Ensure failover mechanisms remain tested.',
+      actImprove: 'Implement better error handling and recovery logic.',
+    },
+    'Security': {
+      strong: 'Security posture is robust.',
+      mod: 'Basic security features present.',
+      weak: 'Critical vulnerabilities may exist.',
+      actStrong: 'Conduct regular security audits.',
+      actImprove: 'Address identified security weaknesses immediately.',
+    },
+    'Maintainability': {
+      strong: 'Code is modular and easy to modify.',
+      mod: 'Some technical debt hampers changes.',
+      weak: 'Coupling is high and testing is difficult.',
+      actStrong: 'Enforce coding standards consistently.',
+      actImprove: 'Refactor complex components and increase tests.',
+    },
+    'Portability': {
+      strong: 'Software adapts well to environments.',
+      mod: 'Adaptation requires some manual effort.',
+      weak: 'Environment specific dependencies exist.',
+      actStrong: 'Verify on new platform versions.',
+      actImprove: 'Isolate environment-specific code.',
+    },
+  };
+
+  const content = map[dimensionId] || {
+    strong: 'Performance is strong.',
+    mod: 'Performance is moderate.',
+    weak: 'Performance needs improvement.',
+    actStrong: 'Maintain current practices.',
+    actImprove: 'Investigate root causes.',
+  };
+
+  return {
+    comment: isStrong ? content.strong : (isModerate ? content.mod : content.weak),
+    action: isStrong ? content.actStrong : content.actImprove
+  };
+}
+
+
 export default function Step4() {
-  const { selectedCaseStudy, selectedDimensions, dimensionWeights, metrics, caseStudies } = useIso15939();
+  const { selectedCaseStudy, selectedDimensions, dimensionWeights, metrics, caseStudies, dimensions: allDimensions } = useIso15939();
   
   const caseStudy = caseStudies.find((cs) => cs.id === selectedCaseStudy);
   const caseStudyDescription = caseStudy?.description || '';
   
-  const { score: overallScore, totalWeight } = useMemo(
+  const { score: overallScore, totalWeight, normalizedWeights } = useMemo(
     () => computeOverallWeightedScore(selectedDimensions, dimensionWeights, metrics),
     [selectedDimensions, dimensionWeights, metrics]
   );
@@ -184,7 +260,7 @@ export default function Step4() {
     return scores;
   }, [selectedDimensions, metrics]);
 
-  // Calculate radar chart geometry based on number of dimensions
+  // Chart Geometry (Restored Logic)
   const chartGeometry = useMemo(() => {
     const numDimensions = selectedDimensions.length;
     const centerX = 200;
@@ -192,11 +268,10 @@ export default function Step4() {
     const radius = 100;
     
     if (numDimensions === 0) {
-      return { outerPoints: '', innerPoints: '', dataPoints: '', axes: [], labelPositions: [] };
+      return { outerPoints: '', innerPoints: '', dataPoints: '', axes: [], labelPositions: [], singleScore: 0 };
     }
     
     if (numDimensions === 1) {
-      // Single dimension: just show score, no polygon
       const score = dimensionScores[selectedDimensions[0]] || 0;
       return {
         outerPoints: '',
@@ -213,20 +288,16 @@ export default function Step4() {
       };
     }
     
-    // Calculate angles (start from top, clockwise)
     const angles = selectedDimensions.map((_, index) => {
-      // Start from top (-90 degrees) and distribute evenly
       return (-90 + (index * 360 / numDimensions)) * (Math.PI / 180);
     });
     
-    // Calculate outer polygon points (at 100% radius)
     const outerPoints = angles.map((angle) => {
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
       return `${x},${y}`;
     }).join(' ');
     
-    // Calculate inner polygon points (at 50% radius)
     const innerRadius = radius * 0.5;
     const innerPoints = angles.map((angle) => {
       const x = centerX + innerRadius * Math.cos(angle);
@@ -234,7 +305,6 @@ export default function Step4() {
       return `${x},${y}`;
     }).join(' ');
     
-    // Calculate data polygon points (using actual scores)
     const dataPoints = angles.map((angle, index) => {
       const score = dimensionScores[selectedDimensions[index]] || 0;
       const dataRadius = radius * (score / 100);
@@ -243,19 +313,16 @@ export default function Step4() {
       return `${x},${y}`;
     }).join(' ');
     
-    // Calculate axes (lines from center to outer points)
     const axes = angles.map((angle) => {
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
       return { x1: centerX, y1: centerY, x2: x, y2: y };
     });
     
-    // Calculate label positions (outside the polygon)
     const labelRadius = radius + 30;
     const labelPositions = angles.map((angle, index) => {
       const x = centerX + labelRadius * Math.cos(angle);
       const y = centerY + labelRadius * Math.sin(angle);
-      // Determine text anchor based on angle
       let anchor: 'start' | 'middle' | 'end' = 'middle';
       if (Math.abs(Math.cos(angle)) > 0.7) {
         anchor = Math.cos(angle) > 0 ? 'start' : 'end';
@@ -281,53 +348,22 @@ export default function Step4() {
       </div>
 
       <div className="step-indicator">
-        <div className="step completed">
-          <div className="step-circle">✓</div>
-          <div className="step-label">Define</div>
-        </div>
-        <div className="step completed">
-          <div className="step-circle">✓</div>
-          <div className="step-label">Plan</div>
-        </div>
-        <div className="step completed">
-          <div className="step-circle">✓</div>
-          <div className="step-label">Collect</div>
-        </div>
-        <div className="step active">
-          <div className="step-circle">4</div>
-          <div className="step-label">Analyse</div>
-        </div>
+        <div className="step completed"><div className="step-circle">✓</div><div className="step-label">Define</div></div>
+        <div className="step completed"><div className="step-circle">✓</div><div className="step-label">Plan</div></div>
+        <div className="step completed"><div className="step-circle">✓</div><div className="step-label">Collect</div></div>
+        <div className="step active"><div className="step-circle">4</div><div className="step-label">Analyse</div></div>
       </div>
 
       <div className="content-area">
         <h2 className="section-title">Step 4: Analyse - Results &amp; Recommendations</h2>
-        <div
-          style={{
-            background: "#f3e8ff",
-            border: "2px solid #d8b4fe",
-            borderRadius: 8,
-            padding: 15,
-            marginBottom: 25,
-          }}
-        >
-          <p style={{ color: "#6b21a8" }}>
-            <strong>Case Study:</strong> {selectedCaseStudy || 'IoT System'} - {caseStudyDescription}
-          </p>
+        
+        <div style={{ background: "#f3e8ff", border: "2px solid #d8b4fe", borderRadius: 8, padding: 15, marginBottom: 25 }}>
+          <p style={{ color: "#6b21a8" }}><strong>Case Study:</strong> {selectedCaseStudy || 'IoT System'} - {caseStudyDescription}</p>
         </div>
 
         {totalWeight !== 100 && (
-          <div
-            style={{
-              background: "#fff3cd",
-              border: "2px solid #ffc107",
-              borderRadius: 8,
-              padding: 15,
-              marginBottom: 25,
-            }}
-          >
-            <p style={{ color: "#856404" }}>
-              <strong>Warning:</strong> Total weight is {totalWeight}% (expected 100%). Calculations use normalized weights.
-            </p>
+          <div style={{ background: "#fff3cd", border: "2px solid #ffc107", borderRadius: 8, padding: 15, marginBottom: 25 }}>
+            <p style={{ color: "#856404" }}><strong>Warning:</strong> Total weight is {totalWeight}% (expected 100%). Calculations use normalized weights.</p>
           </div>
         )}
 
@@ -351,133 +387,40 @@ export default function Step4() {
                   </linearGradient>
                 </defs>
                 {selectedDimensions.length === 1 ? (
-                  // Single dimension: just show score
                   <>
-                    <circle
-                      cx="200"
-                      cy="150"
-                      r="80"
-                      fill="url(#radarGrad)"
-                      stroke="#4c51bf"
-                      strokeWidth="3"
-                    />
-                    <text
-                      x="200"
-                      y="145"
-                      textAnchor="middle"
-                      fill="#2d3748"
-                      fontSize="32"
-                      fontWeight="700"
-                    >
+                    <circle cx="200" cy="150" r="80" fill="url(#radarGrad)" stroke="#4c51bf" strokeWidth="3" />
+                    <text x="200" y="145" textAnchor="middle" fill="#2d3748" fontSize="32" fontWeight="700">
                       {chartGeometry.singleScore?.toFixed(1) || '0'}
                     </text>
-                    <text
-                      x="200"
-                      y="165"
-                      textAnchor="middle"
-                      fill="#718096"
-                      fontSize="14"
-                    >
-                      /100
-                    </text>
+                    <text x="200" y="165" textAnchor="middle" fill="#718096" fontSize="14">/100</text>
                     {chartGeometry.labelPositions.map((pos) => (
-                      <text
-                        key={pos.dimensionId}
-                        x={pos.x}
-                        y={pos.y}
-                        textAnchor={pos.anchor as "start" | "middle" | "end"}
-                        fill="#2d3748"
-                        fontSize="14"
-                        fontWeight="600"
-                      >
+                      <text key={pos.dimensionId} x={pos.x} y={pos.y} textAnchor={pos.anchor as "start" | "middle" | "end"} fill="#2d3748" fontSize="14" fontWeight="600">
                         {selectedDimensions[0]}
                       </text>
                     ))}
                   </>
                 ) : selectedDimensions.length === 2 ? (
-                  // Two dimensions: show line (dengeli çizgi)
                   <>
-                    <line
-                      x1={chartGeometry.axes[0]?.x2 || 200}
-                      y1={chartGeometry.axes[0]?.y2 || 150}
-                      x2={chartGeometry.axes[1]?.x2 || 200}
-                      y2={chartGeometry.axes[1]?.y2 || 150}
-                      stroke="#e2e8f0"
-                      strokeWidth="2"
-                    />
-                    <line
-                      x1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[0] || 200}
-                      y1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[1] || 150}
-                      x2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[0] || 200}
-                      y2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[1] || 150}
-                      stroke="#4c51bf"
-                      strokeWidth="4"
-                    />
+                    <line x1={chartGeometry.axes[0]?.x2 || 200} y1={chartGeometry.axes[0]?.y2 || 150} x2={chartGeometry.axes[1]?.x2 || 200} y2={chartGeometry.axes[1]?.y2 || 150} stroke="#e2e8f0" strokeWidth="2" />
+                    <line x1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[0]} y1={chartGeometry.dataPoints.split(' ')[0]?.split(',')[1]} x2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[0]} y2={chartGeometry.dataPoints.split(' ')[1]?.split(',')[1]} stroke="#4c51bf" strokeWidth="4" />
                     {chartGeometry.labelPositions.map((pos) => (
-                      <text
-                        key={pos.dimensionId}
-                        x={pos.x}
-                        y={pos.y}
-                        textAnchor={pos.anchor as "start" | "middle" | "end"}
-                        fill="#2d3748"
-                        fontSize="12"
-                        fontWeight="600"
-                      >
+                      <text key={pos.dimensionId} x={pos.x} y={pos.y} textAnchor={pos.anchor as "start" | "middle" | "end"} fill="#2d3748" fontSize="12" fontWeight="600">
                         {pos.dimensionId.split(' ')[0]} ({dimensionScores[pos.dimensionId]?.toFixed(1) || '0'})
                       </text>
                     ))}
                   </>
                 ) : (
-                  // Three or more dimensions: show polygon
                   <>
-                    {chartGeometry.outerPoints && (
-                <polygon
-                        points={chartGeometry.outerPoints}
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeWidth="2"
-                />
-                    )}
-                    {chartGeometry.innerPoints && (
-                <polygon
-                        points={chartGeometry.innerPoints}
-                  fill="none"
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
-                    )}
+                    {chartGeometry.outerPoints && <polygon points={chartGeometry.outerPoints} fill="none" stroke="#e2e8f0" strokeWidth="2" />}
+                    {(chartGeometry as any).innerPoints && <polygon points={(chartGeometry as any).innerPoints} fill="none" stroke="#cbd5e0" strokeWidth="1" />}
                     {chartGeometry.axes.map((axis, index) => (
-                <line
-                        key={index}
-                        x1={axis.x1}
-                        y1={axis.y1}
-                        x2={axis.x2}
-                        y2={axis.y2}
-                  stroke="#cbd5e0"
-                  strokeWidth="1"
-                />
+                      <line key={index} x1={axis.x1} y1={axis.y1} x2={axis.x2} y2={axis.y2} stroke="#cbd5e0" strokeWidth="1" />
                     ))}
-                    {chartGeometry.dataPoints && (
-                <polygon
-                        points={chartGeometry.dataPoints}
-                  fill="url(#radarGrad)"
-                  stroke="#4c51bf"
-                  strokeWidth="3"
-                />
-                    )}
+                    {chartGeometry.dataPoints && <polygon points={chartGeometry.dataPoints} fill="url(#radarGrad)" stroke="#4c51bf" strokeWidth="3" />}
                     {chartGeometry.labelPositions.map((pos) => {
-                      // Shorten dimension names for display
                       const shortName = pos.dimensionId.split(' ')[0];
                       return (
-                        <text
-                          key={pos.dimensionId}
-                          x={pos.x}
-                          y={pos.y}
-                          textAnchor={pos.anchor as "start" | "middle" | "end"}
-                          fill="#2d3748"
-                          fontSize="12"
-                          fontWeight="600"
-                        >
+                        <text key={pos.dimensionId} x={pos.x} y={pos.y} textAnchor={pos.anchor as "start" | "middle" | "end"} fill="#2d3748" fontSize="12" fontWeight="600">
                           {shortName} ({dimensionScores[pos.dimensionId]?.toFixed(1) || '0'})
                         </text>
                       );
@@ -487,49 +430,172 @@ export default function Step4() {
               </svg>
             </div>
           </div>
+        </div>
 
-          <div className="gap-analysis">
-            <div className="chart-title">⚠️ Gap Analysis</div>
-            {gaps.filter((gap) => gap.severity !== 'ok').length === 0 ? (
-              <div style={{ padding: '15px', color: '#28a745' }}>
-                All dimensions meet the target score (≥{TARGET_SCORE}).
-              </div>
-            ) : (
-              gaps
-                .filter((gap) => gap.severity !== 'ok')
-                .map((gap) => (
-                  <div key={gap.dimensionId} className={`gap-item ${gap.severity}`}>
-                    <div>
-                      <span className="gap-name">{gap.dimensionId}</span>
-                      <span className={`gap-badge ${gap.severity}`}>
-                        {gap.severity === 'critical' ? 'Critical' : 'Moderate'}
+        {/* --- SUMMARY TABLE (PDF Compliance) --- */}
+        <div style={{ marginTop: '2rem', marginBottom: '2rem', overflowX: 'auto' }}>
+          <h3 style={{ color: '#2d3748', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem' }}>Summary Table</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem', fontSize: '0.95rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f7fafc', textAlign: 'left', color: '#2d3748' }}>
+                <th style={{ padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Quality Characteristic</th>
+                <th style={{ padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Score (0-100)</th>
+                <th style={{ padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Weighted Contribution</th>
+                <th style={{ padding: '10px', borderBottom: '2px solid #e2e8f0' }}>Interpretation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {selectedDimensions.map((dimId) => {
+                const score = dimensionScores[dimId] || 0;
+                const weight = normalizedWeights[dimId] || 0;
+                const weightedVal = score * (weight / 100);
+                const interpretation = getInterpretation(score);
+                const color = interpretation === 'Strong' ? '#2f855a' : interpretation === 'Moderate' ? '#b7791f' : '#c53030';
+                const bg = interpretation === 'Strong' ? '#f0fff4' : interpretation === 'Moderate' ? '#fffff0' : '#fff5f5';
+
+                return (
+                  <tr key={dimId} style={{ borderBottom: '1px solid #edf2f7' }}>
+                    <td style={{ padding: '10px', fontWeight: 500, color: '#2d3748' }}>{dimId}</td>
+                    <td style={{ padding: '10px', color: '#2d3748' }}>{score.toFixed(1)}</td>
+                    <td style={{ padding: '10px', color: '#2d3748' }}>{weightedVal.toFixed(1)}</td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{
+                        backgroundColor: bg,
+                        color: color,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '0.85em'
+                      }}>
+                        {interpretation}
                       </span>
-              </div>
-              <div className="gap-score">
-                      <div className="gap-score-value">{gap.score.toFixed(1)}</div>
-                      <div className="gap-score-diff">Gap: {gap.gap.toFixed(1)}</div>
-              </div>
-            </div>
-                ))
-            )}
-          </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-          <div className="recommendations">
-            <div className="chart-title">💡 Recommendations</div>
-            {recommendations.length === 0 ? (
-              <div style={{ padding: '15px', color: '#28a745' }}>
-                No recommendations. All dimensions are performing well.
-              </div>
-            ) : (
-              recommendations.map((rec) => (
-                <div key={rec.dimensionId} className="recommendation-item">
-                  <div className="rec-number">{rec.priority}.</div>
-                  <div className="rec-text">{rec.text}</div>
+        {/* --- GAP ANALYSIS (Existing Layout) --- */}
+        <div className="gap-analysis">
+          <div className="chart-title">⚠️ Gap Analysis</div>
+          {gaps.filter((gap) => gap.severity !== 'ok').length === 0 ? (
+            <div style={{ padding: '15px', color: '#28a745' }}>
+              All dimensions meet the target score (≥{TARGET_SCORE}).
             </div>
+          ) : (
+            gaps
+              .filter((gap) => gap.severity !== 'ok')
+              .map((gap) => (
+                <div key={gap.dimensionId} className={`gap-item ${gap.severity}`}>
+                  <div>
+                    <span className="gap-name">{gap.dimensionId}</span>
+                    <span className={`gap-badge ${gap.severity}`}>
+                      {gap.severity === 'critical' ? 'Critical' : 'Moderate'}
+                    </span>
+                  </div>
+                  <div className="gap-score">
+                    <div className="gap-score-value">{gap.score.toFixed(1)}</div>
+                    <div className="gap-score-diff">Gap: {gap.gap.toFixed(1)}</div>
+                  </div>
+                </div>
               ))
-            )}
+          )}
+        </div>
+
+        {/* --- INTERPRET RESULTS (PDF Compliance) --- */}
+        <div className="interpretation-section" style={{ marginTop: '2rem' }}>
+          <h2 className="section-title">Interpret Results</h2>
+          <div style={{ display: 'grid', gap: '1.5rem' }}>
+            {/* Strong Areas */}
+            <div className="interp-group">
+               <h3 style={{ color: '#276749', borderBottom: '2px solid #48bb78', paddingBottom: '0.5rem', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                 Strong Areas (Score ≥ 80)
+               </h3>
+               {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Strong').length === 0 ? (
+                 <p style={{ fontStyle: 'italic', color: '#232427ff' }}>No strong areas identified.</p>
+               ) : (
+                 <div style={{ display: 'grid', gap: '1rem' }}>
+                   {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Strong').map(d => {
+                     const details = getInterpretationDetails(d, 'Strong');
+                     return (
+                       <div key={d} style={{ background: '#f0fff4', padding: '1rem', borderRadius: '6px', borderLeft: '4px solid #48bb78', color: '#1d232cff'  }}>
+                         <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{d}</div>
+                         <div style={{ marginBottom: '0.5rem' }}>{details.comment}</div>
+                         <div style={{ fontSize: '0.9em', color: '#2f855a' }}>💡 {details.action}</div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
+
+            {/* Moderate Areas */}
+            <div className="interp-group">
+               <h3 style={{ color: '#975a16', borderBottom: '2px solid #ecc94b', paddingBottom: '0.5rem', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                 Moderate Areas (60 ≤ Score &lt; 80)
+               </h3>
+               {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Moderate').length === 0 ? (
+                 <p style={{ fontStyle: 'italic', color: '#232427ff' }}>No moderate areas identified.</p>
+               ) : (
+                 <div style={{ display: 'grid', gap: '1rem' }}>
+                   {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Moderate').map(d => {
+                     const details = getInterpretationDetails(d, 'Moderate');
+                     return (
+                       <div key={d} style={{ background: '#fffff0', padding: '1rem', borderRadius: '6px', borderLeft: '4px solid #ecc94b', color: '#1d232cff' }}>
+                         <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{d}</div>
+                         <div style={{ marginBottom: '0.5rem' }}>{details.comment}</div>
+                         <div style={{ fontSize: '0.9em', color: '#744210' }}>💡 {details.action}</div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
+
+            {/* Weak Areas */}
+            <div className="interp-group">
+               <h3 style={{ color: '#9b2c2c', borderBottom: '2px solid #f56565', paddingBottom: '0.5rem', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                 Weak Areas (Score &lt; 60)
+               </h3>
+               {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Weak').length === 0 ? (
+                 <p style={{ fontStyle: 'italic', color: '#232427ff' }}>No weak areas identified.</p>
+               ) : (
+                 <div style={{ display: 'grid', gap: '1rem' }}>
+                   {selectedDimensions.filter(d => getInterpretation(dimensionScores[d]) === 'Weak').map(d => {
+                     const details = getInterpretationDetails(d, 'Weak');
+                     return (
+                       <div key={d} style={{ background: '#fff5f5', padding: '1rem', borderRadius: '6px', borderLeft: '4px solid #f56565', color: '#1d232cff' }}>
+                         <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{d}</div>
+                         <div style={{ marginBottom: '0.5rem' }}>{details.comment}</div>
+                         <div style={{ fontSize: '0.9em', color: '#c53030' }}>💡 {details.action}</div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               )}
+            </div>
           </div>
         </div>
+
+        {/* --- RECOMMENDATIONS (Existing Layout) --- */}
+        <div className="recommendations" style={{ marginTop: '2rem' }}>
+          <div className="chart-title">💡 Detailed Recommendations</div>
+          {recommendations.length === 0 ? (
+            <div style={{ padding: '15px', color: '#28a745' }}>
+              No critical or moderate recommendations. All dimensions are performing well.
+            </div>
+          ) : (
+            recommendations.map((rec) => (
+              <div key={rec.dimensionId} className="recommendation-item">
+                <div className="rec-number">{rec.priority}.</div>
+                <div className="rec-text">{rec.text}</div>
+              </div>
+            ))
+          )}
+        </div>
+
       </div>
     </>
   );

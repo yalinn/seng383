@@ -81,7 +81,7 @@ body {
 .screenshot {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   border: 1px solid #e2e8f0;
 }
@@ -102,9 +102,17 @@ body {
   background: #cbd5e0;
 }
 
-.chrome-dot.red { background: #fc5c65; }
-.chrome-dot.yellow { background: #fed330; }
-.chrome-dot.green { background: #26de81; }
+.chrome-dot.red {
+  background: #fc5c65;
+}
+
+.chrome-dot.yellow {
+  background: #fed330;
+}
+
+.chrome-dot.green {
+  background: #26de81;
+}
 
 .url-bar {
   flex: 1;
@@ -201,7 +209,7 @@ body {
   background: white;
   border-radius: 12px;
   padding: 40px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
 .section-title {
