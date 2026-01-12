@@ -7,11 +7,10 @@ interface Iso15939ProviderProps {
   children: ReactNode;
 }
 
-// All 8 ISO 25010 Product Quality characteristics
+// All 7 ISO 25010 Product Quality characteristics (Compatibility Removed)
 const ALL_ISO_25010_DIMENSIONS = [
   'Functional Suitability',
   'Performance Efficiency',
-  'Compatibility',
   'Usability',
   'Reliability',
   'Security',
@@ -21,13 +20,15 @@ const ALL_ISO_25010_DIMENSIONS = [
 
 export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedDimensions, setSelectedDimensions] = useState<string[]>(['Performance Efficiency', 'Compatibility', 'Reliability', 'Security']);
+  // Default: Performance, Reliability, Usability, Security (PDF compliant defaults)
+  const [selectedDimensions, setSelectedDimensions] = useState<string[]>(['Performance Efficiency', 'Reliability', 'Usability', 'Security']);
   const [selectedCaseStudy, setSelectedCaseStudy] = useState<string>('IoT System');
+  // Default weights sum to 100
   const [dimensionWeights, setDimensionWeights] = useState<Record<string, number>>({
-    'Performance Efficiency': 30,
-    'Compatibility': 25,
+    'Performance Efficiency': 25,
     'Reliability': 25,
-    'Security': 20,
+    'Usability': 25,
+    'Security': 25,
   });
 
   const caseStudies: CaseStudy[] = [
@@ -35,7 +36,8 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       id: 'IoT System',
       title: 'IoT System',
       description: 'Internet of Things device with resource constraints and connectivity requirements',
-      dimensions: ['Performance Efficiency', 'Compatibility', 'Reliability', 'Security'],
+      // Replaced Compatibility with Portability
+      dimensions: ['Performance Efficiency', 'Reliability', 'Security', 'Portability'],
     },
     {
       id: 'Safety Critical (Health)',
@@ -47,7 +49,8 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
       id: 'Mobile Application',
       title: 'Mobile Application',
       description: 'Consumer mobile app focused on user experience and cross-platform compatibility',
-      dimensions: ['Usability', 'Compatibility', 'Performance Efficiency', 'Portability'],
+      // Replaced Compatibility with Functional Suitability
+      dimensions: ['Usability', 'Performance Efficiency', 'Portability', 'Functional Suitability'],
     },
   ];
 
@@ -55,7 +58,6 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     const subCharsMap: Record<string, string> = {
       'Functional Suitability': 'Functional completeness',
       'Performance Efficiency': '3 sub-characteristics',
-      'Compatibility': '2 sub-characteristics',
       'Usability': 'User error protection',
       'Reliability': '4 sub-characteristics',
       'Security': '5 sub-characteristics',
@@ -125,21 +127,6 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
           value: 500,
         }
       );
-    } else if (dimensionId === 'Compatibility') {
-      metrics.push({
-        id: `co-existence-${caseStudyId || 'default'}`,
-        name: 'Co-existence',
-        description: caseStudyId === 'Mobile Application' 
-          ? 'Cross-platform compatibility' 
-          : 'Ability to coexist with other products',
-        dimensionId: 'Compatibility',
-        subCharacteristic: 'Co-existence',
-        min: 0,
-        max: 100,
-        direction: 'higher',
-        unit: '%',
-        value: caseStudyId === 'Mobile Application' ? 90 : 85,
-      });
     } else if (dimensionId === 'Usability') {
       metrics.push({
         id: `user-error-rate-${caseStudyId || 'default'}`,
@@ -253,7 +240,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
   }, [getMetricsForDimension]);
 
   const [metrics, setMetrics] = useState<Metric[]>(() =>
-    initializeMetricsForCaseStudy('IoT System', ['Performance Efficiency', 'Compatibility', 'Reliability', 'Security'])
+    initializeMetricsForCaseStudy('IoT System', ['Performance Efficiency', 'Reliability', 'Usability', 'Security'])
   );
 
   // Update metrics when case study or dimensions change
@@ -384,6 +371,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     }));
   };
 
+  // setMetricValue WITHOUT clamping, to allow Step 3 validation/warning logic
   const setMetricValue = (metricId: string, value: number) => {
     setMetrics((prev) =>
       prev.map((metric) =>
@@ -408,14 +396,14 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
 
   const startNewMeasurement = () => {
     setCurrentStep(1);
-    const defaultDimensions = ['Performance Efficiency', 'Compatibility', 'Reliability', 'Security'];
+    const defaultDimensions = ['Performance Efficiency', 'Reliability', 'Usability', 'Security'];
     setSelectedDimensions(defaultDimensions);
     setSelectedCaseStudy('IoT System');
     setDimensionWeights({
-      'Performance Efficiency': 30,
-      'Compatibility': 25,
+      'Performance Efficiency': 25,
       'Reliability': 25,
-      'Security': 20,
+      'Usability': 25,
+      'Security': 25,
     });
     setMetrics(initializeMetricsForCaseStudy('IoT System', defaultDimensions));
   };
