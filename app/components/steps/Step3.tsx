@@ -1,9 +1,32 @@
 'use client';
 
 import { useIso15939 } from '../../contexts/Iso15939Context';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function Step3() {
   const { selectedDimensions, metrics, setMetricValue } = useIso15939();
+  
+  // Local state for input values to allow proper display and editing
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  
+  // Get metric IDs as a stable reference for dependency
+  const metricIds = useMemo(() => metrics.map(m => m.id).sort().join(','), [metrics]);
+  
+  // Initialize input values from metrics when metrics are first loaded or new metrics are added
+  useEffect(() => {
+    setInputValues((prev) => {
+      const newInputValues: Record<string, string> = { ...prev };
+      let hasNewMetrics = false;
+      metrics.forEach((metric) => {
+        // Only initialize if not already in inputValues (preserve user input)
+        if (!(metric.id in newInputValues)) {
+          newInputValues[metric.id] = metric.value.toString();
+          hasNewMetrics = true;
+        }
+      });
+      return hasNewMetrics ? newInputValues : prev;
+    });
+  }, [metricIds, metrics]);
 
   // Filter metrics by selected dimensions and group by dimension
   const metricsByDimension = selectedDimensions.reduce((acc, dimensionId) => {
@@ -73,11 +96,22 @@ export default function Step3() {
                           <input
                             type="number"
                             className="metric-input"
-                            value={metric.value}
+                            value={inputValues[metric.id] ?? metric.value.toString()}
                             onChange={(e) => {
-                              const numValue = parseFloat(e.target.value);
+                              const value = e.target.value;
+                              setInputValues((prev) => ({ ...prev, [metric.id]: value }));
+                              const numValue = parseFloat(value);
                               if (!isNaN(numValue)) {
-                                setMetricValue(metric.id, numValue);
+                                const clampedValue = Math.max(metric.min, Math.min(metric.max, numValue));
+                                setMetricValue(metric.id, clampedValue);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // On blur, if empty or invalid, reset to current metric value
+                              const value = e.target.value;
+                              const numValue = parseFloat(value);
+                              if (value === '' || isNaN(numValue)) {
+                                setInputValues((prev) => ({ ...prev, [metric.id]: metric.value.toString() }));
                               }
                             }}
                             min={metric.min}

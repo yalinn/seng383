@@ -1,9 +1,23 @@
 'use client';
 
 import { useIso15939 } from '../../contexts/Iso15939Context';
+import { useState, useEffect } from 'react';
 
 export default function Step2() {
   const { selectedCaseStudy, selectedDimensions, dimensionWeights, setDimensionWeight } = useIso15939();
+  
+  // Local state for input values to allow empty inputs
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  
+  // Initialize input values from dimensionWeights when they change
+  useEffect(() => {
+    const newInputValues: Record<string, string> = {};
+    selectedDimensions.forEach((dimId) => {
+      const weight = dimensionWeights[dimId];
+      newInputValues[dimId] = weight !== undefined ? weight.toString() : '';
+    });
+    setInputValues(newInputValues);
+  }, [selectedDimensions, dimensionWeights]);
   
   // Toplam weight hesapla
   const totalWeight = selectedDimensions.reduce((sum, dimId) => sum + (dimensionWeights[dimId] || 0), 0);
@@ -58,7 +72,7 @@ export default function Step2() {
 
         <div className="weight-list">
           {selectedDimensions.map((dimensionId) => {
-            const weight = dimensionWeights[dimensionId] || Math.round(100 / selectedDimensions.length);
+            const inputValue = inputValues[dimensionId] ?? '';
             return (
               <div key={dimensionId} className="weight-item">
                 <div className="weight-label">{dimensionId}</div>
@@ -66,14 +80,27 @@ export default function Step2() {
                   <input
                     type="number"
                     className="weight-input"
-                    value={weight}
+                    value={inputValue}
                     onChange={(e) => {
-                      const newWeight = parseInt(e.target.value) || 0;
-                      setDimensionWeight(dimensionId, newWeight);
+                      const value = e.target.value;
+                      setInputValues((prev) => ({ ...prev, [dimensionId]: value }));
+                      const numValue = parseInt(value);
+                      if (value === '' || isNaN(numValue)) {
+                        setDimensionWeight(dimensionId, 0);
+                      } else {
+                        setDimensionWeight(dimensionId, Math.max(0, Math.min(100, numValue)));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // On blur, if empty, set to 0 but keep input empty for UX
+                      if (e.target.value === '') {
+                        setDimensionWeight(dimensionId, 0);
+                      }
                     }}
                     min="0"
                     max="100"
                     style={{ background: "#ffffff", color: "#2d3748" }}
+                    placeholder="0"
                   />
                   <span className="weight-percent">%</span>
                 </div>
