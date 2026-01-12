@@ -92,33 +92,40 @@ export default function Step3() {
                             Measured sub-characteristic: {metric.subCharacteristic} (ISO/IEC 25010)
                           </div>
                         </div>
-                        <div className="metric-input-row">
-                          <input
-                            type="number"
-                            className="metric-input"
-                            value={inputValues[metric.id] ?? metric.value.toString()}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setInputValues((prev) => ({ ...prev, [metric.id]: value }));
-                              const numValue = parseFloat(value);
-                              if (!isNaN(numValue)) {
-                                const clampedValue = Math.max(metric.min, Math.min(metric.max, numValue));
-                                setMetricValue(metric.id, clampedValue);
-                              }
-                            }}
-                            onBlur={(e) => {
-                              // On blur, if empty or invalid, reset to current metric value
-                              const value = e.target.value;
-                              const numValue = parseFloat(value);
-                              if (value === '' || isNaN(numValue)) {
-                                setInputValues((prev) => ({ ...prev, [metric.id]: metric.value.toString() }));
-                              }
-                            }}
-                            min={metric.min}
-                            max={metric.max}
-                            step="any"
-                          />
-                          <span className="metric-unit">{metric.unit}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <div className="metric-input-row">
+                            <input
+                              type="number"
+                              className="metric-input"
+                              value={inputValues[metric.id] ?? metric.value.toString()}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setInputValues((prev) => ({ ...prev, [metric.id]: value }));
+                                const numValue = parseFloat(value);
+                                  if (!isNaN(numValue)) {
+                                  const validValue = numValue; // Store raw value for validation
+                                  setMetricValue(metric.id, validValue);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                // On blur, if empty or invalid, reset to current metric value
+                                const value = e.target.value;
+                                const numValue = parseFloat(value);
+                                if (value === '' || isNaN(numValue)) {
+                                  setInputValues((prev) => ({ ...prev, [metric.id]: metric.value.toString() }));
+                                }
+                              }}
+                              min={metric.min}
+                              max={metric.max}
+                              step="any"
+                            />
+                            <span className="metric-unit">{metric.unit}</span>
+                          </div>
+                          {(metric.value < metric.min || metric.value > metric.max) && (
+                            <div style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '4px' }}>
+                              Value must be between {metric.min} and {metric.max}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="metric-info">

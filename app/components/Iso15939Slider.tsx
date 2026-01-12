@@ -11,7 +11,16 @@ export default function Iso15939Slider() {
   
   // Calculate total weight for Step2 validation
   const totalWeight = selectedDimensions.reduce((sum, dimId) => sum + (dimensionWeights[dimId] || 0), 0);
+
   const isStep2Valid = currentStep !== 2 || totalWeight === 100;
+
+  // Validate Step 3 (Collect)
+  // Check if all metrics are within their defined min/max range
+  const shouldValidateStep3 = currentStep === 3;
+  const metricsList = useIso15939().metrics;
+  const isStep3Valid = !shouldValidateStep3 || metricsList.every(m => m.value >= m.min && m.value <= m.max);
+
+  const canProceed = isStep2Valid && isStep3Valid;
 
   const steps = [
     { id: 1, component: <Step1 /> },
@@ -44,7 +53,7 @@ export default function Iso15939Slider() {
                 Start New Measurement
               </button>
             ) : (
-              <button className="nav-btn" onClick={nextStep} disabled={!isStep2Valid} style={{ opacity: isStep2Valid ? 1 : 0.5, cursor: isStep2Valid ? 'pointer' : 'not-allowed' }}>
+              <button className="nav-btn" onClick={nextStep} disabled={!canProceed} style={{ opacity: canProceed ? 1 : 0.5, cursor: canProceed ? 'pointer' : 'not-allowed' }}>
                 Next
               </button>
             )}

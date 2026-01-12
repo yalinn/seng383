@@ -388,7 +388,7 @@ export default function Iso15939Provider({ children }: Iso15939ProviderProps) {
     setMetrics((prev) =>
       prev.map((metric) =>
         metric.id === metricId
-          ? { ...metric, value: Math.max(metric.min, Math.min(metric.max, value)) }
+          ? { ...metric, value: value }
           : metric
       )
     );
