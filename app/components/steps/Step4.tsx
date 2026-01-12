@@ -118,10 +118,14 @@ function generateRecommendations(
   const recommendations: Recommendation[] = [];
   
   const recommendationMap: Record<string, string> = {
+    'Functional Suitability': 'Improve Functional Suitability: Conduct requirements analysis to identify missing functions, implement user-requested features, and ensure the software meets all specified functional requirements.',
     'Performance Efficiency': 'Optimize Performance Efficiency: Implement efficient algorithms, reduce resource consumption, optimize data structures, and use caching strategies to improve response times and capacity.',
-    'Reliability': 'Enhance Reliability: Implement robust error handling, add redundancy, improve monitoring and logging, and establish disaster recovery procedures to increase availability and reduce recovery time.',
     'Compatibility': 'Improve Compatibility: Ensure interoperability with other systems, follow standard protocols and interfaces, and test cross-platform compatibility to enhance co-existence.',
+    'Usability': 'Enhance Usability: Simplify user interfaces, provide clear feedback and error messages, conduct user testing, and implement user error protection mechanisms.',
+    'Reliability': 'Enhance Reliability: Implement robust error handling, add redundancy, improve monitoring and logging, and establish disaster recovery procedures to increase availability and reduce recovery time.',
     'Security': 'Strengthen Security: Implement secure authentication and authorization, encrypt data in transit and at rest, conduct regular security audits, and keep software dependencies up to date.',
+    'Maintainability': 'Improve Maintainability: Increase test coverage, refactor code for better structure, improve documentation, and implement automated testing and CI/CD pipelines.',
+    'Portability': 'Enhance Portability: Ensure cross-platform compatibility, simplify installation procedures, use standard libraries and frameworks, and test on multiple environments.',
   };
   
   gaps.forEach((gap, index) => {
@@ -134,7 +138,8 @@ function generateRecommendations(
     }
   });
   
-  return recommendations;
+  // Limit to max 5 items
+  return recommendations.slice(0, 5);
 }
 
 function getRatingLabel(score: number): string {
